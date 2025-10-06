@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Shorts App</title>
+    
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <style>
+        /* Global Reset and Scrollbar Hide */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #000;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Hide scrollbar for a cleaner mobile look */
+        ::-webkit-scrollbar { display: none; }
+        .shorts-feed { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Mobile Frame */
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            height: 100vh;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Tabs (REMOVED - Kept for reference but hidden in HTML) */
+        .top-tabs-container {
+            display: none !important;
+        }
+
+
+        /* Shorts Video Feed Area */
+        .shorts-feed {
+            flex-grow: 1;
+            width: 100%;
+            height: calc(100vh - 50px); 
+            position: relative;
+            overflow-y: scroll;
+            /* Scroll Snap for one video at a time */
+            scroll-snap-type: y mandatory;
+            scroll-snap-stop: always; 
+            scroll-behavior: smooth; 
+            margin-top: 0; /* Starts from the top of the app-container */
+        }
+
+        .video-container {
+            width: 100%;
+            height: calc(100vh - 50px); 
+            scroll-snap-align: start; 
+            position: relative;
+            background-color: #000; 
+        }
+        
+        /* Embed Container Styling */
+        .embed-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Styling for the iframe inside the container - make it cover */
+        .embed-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+        
+        /* Video Overlay UI - Allows clicks to go through to the iframe */
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 15px;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent 40%); 
+            color: #fff;
+            z-index: 2; 
+            pointer-events: none; 
+        }
+
+        /* Top Left Info (View Count Only) */
+        .top-left-stats {
+            position: absolute;
+            top: 15px; /* Moved up since top tabs are gone */
+            left: 15px;
+            text-align: left;
+            pointer-events: none; 
+            background-color: rgba(0,0,0,0.4); 
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: flex;
+            gap: 15px;
+        }
+        .stat-group {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+            color: #fff;
+            margin: 0;
+            text-shadow: 1px 1px 3px #000;
+        }
+        .stat-group .material-icons {
+            font-size: 1.2em;
+            margin-right: 5px;
+            color: #FFC107; /* Orange for view icon */
+        }
+        
+
+        /* Bottom Left Info (TikTok Style) */
+        .bottom-info {
+            position: absolute;
+            bottom: 65px; /* Above the bottom nav */
+            left: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Space between user info and title/caption */
+        }
+        
+        .user-info-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            pointer-events: all; /* Important for clicking follow/profile */
+        }
+        
+        .user-profile-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #E91E63;
+            color: #fff;
+            font-weight: 700;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.9em;
+            flex-shrink: 0;
+            cursor: pointer;
+            pointer-events: all;
+            object-fit: cover;
+        }
+        
+        .username-text {
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.1em;
+            text-shadow: 1px 1px 3px #000;
+            margin-right: 5px;
+        }
+        
+        .follow-btn {
+            background-color: #FFC107; /* Changed to Yellow */
+            color: #000; /* Text color black for contrast */
+            border: none;
+            padding: 3px 8px; /* Smaller padding */
+            border-radius: 5px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            pointer-events: all;
+            height: 25px; 
+        }
+        .follow-btn.following {
+             background-color: #555; /* Gray when following */
+             color: #FFF;
+        }
+
+        .bottom-info h2 {
+            font-size: 1.1em;
+            font-weight: 500;
+            margin: 0;
+            text-shadow: 1px 1px 3px #000;
+        }
+
+        /* Action Buttons (Right Side) */
+        .action-buttons {
+            position: absolute;
+            right: 15px;
+            bottom: 80px; /* Moved up to match TikTok spacing */
+            display: flex;
+            flex-direction: column;
+            gap: 15px; 
+            align-items: center;
+            z-index: 5; 
+            pointer-events: all; 
+        }
+
+        /* ** লাইক/কমেন্ট বাটনের নতুন স্টাইল ** */
+        .action-btn {
+            background-color: transparent; 
+            border: none;
+            color: #fff;
+            padding: 0;
+            cursor: pointer;
+            font-size: 1.2em; 
+            width: 55px; 
+            height: 55px; 
+            border-radius: 10px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s, background-color 0.2s;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: none; 
+        }
+        
+        .action-btn:active {
+            transform: scale(0.9);
+            background-color: rgba(255, 255, 255, 0.15); 
+        }
+
+        .action-btn span:last-child {
+            font-size: 0.8em; 
+            margin-top: 2px; 
+            font-weight: 500;
+        }
+        
+        .like-icon, .dislike-icon, .comment-icon-btn, .share-icon-btn { 
+            font-size: 1.8em; 
+            color: #fff;
+            transition: color 0.2s;
+            line-height: 1; 
+        }
+
+        .like-icon.liked {
+            color: #E91E63; 
+        }
+        .dislike-icon.disliked {
+            color: #64B5F6; 
+        }
+
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+        }
+        .action-btn .material-symbols-outlined {
+            font-size: 28px; 
+            line-height: 1;
+        }
+        
+        /* Bottom Navigation Bar */
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 50px;
+            background-color: #000; 
+            border-top: 1px solid #222;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 15; 
+        }
+
+        .nav-item {
+            color: #777;
+            text-decoration: none;
+            font-size: 0.9em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 10px;
+            transition: color 0.3s;
+        }
+        
+        .nav-item .material-icons {
+            font-size: 24px;
+        }
+
+        .nav-item.active {
+            color: #FFC107; 
+            font-weight: bold;
+        }
+
+        /* Screens (Full Screen Pages) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #FFF;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 20; 
+            overflow-y: auto; 
+        }
+        .screen-active {
+            display: flex;
+        }
+        
+        /* Form elements */
+        .input-field {
+            width: 100%;
+            padding: 12px 10px;
+            margin-bottom: 10px;
+            border: 1px solid #DDD;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        
+        /* NEW SIMPLE APP BUTTON STYLES */
+        .app-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .primary-btn {
+            background-color: #FFC107; 
+            color: #333;
+        }
+        .secondary-btn {
+            background-color: #F0F0F0; 
+            color: #333;
+            border: 1px solid #DDD;
+        }
+        
+        /* Admin list buttons */
+        .admin-video-actions .delete-btn, .admin-video-actions .edit-btn {
+            padding: 5px 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+            border-radius: 4px;
+            width: auto;
+        }
+        .admin-video-actions .delete-btn {
+            background-color: #E91E63;
+            color: white;
+        }
+        .admin-video-actions .edit-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        /* অ্যাডমিন প্যানেল স্ক্রোল ফিক্স */
+        #admin-panel-screen #admin-video-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto; 
+            flex-grow: 1; 
+        }
+        
+        /* --- FULL-SCREEN COMMENT MODAL STYLES --- */
+        #comment-screen {
+            position: fixed; 
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(100vh); 
+            width: 100%;
+            max-width: 450px; 
+            height: 100vh; 
+            background-color: #FFF;
+            display: flex;
+            flex-direction: column;
+            padding: 0; 
+            box-sizing: border-box;
+            z-index: 25; 
+            border-radius: 0; 
+            box-shadow: none; 
+            transition: transform 0.3s ease-out; 
+            pointer-events: none; 
+            overflow: hidden; 
+        }
+        
+        /* Active state: Slide up to 0 position */
+        #comment-screen.screen-active {
+            transform: translateX(-50%) translateY(0); 
+            pointer-events: all; 
+        }
+
+        .comment-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #EEE;
+            flex-shrink: 0; 
+            position: relative;
+        }
+
+        .comment-modal-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0 15px 0 15px; 
+            overflow: hidden; 
+        }
+
+        .page-header {
+            text-align: center;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            position: relative;
+            width: 100%;
+            border-bottom: 1px solid #EEE;
+        }
+        
+        .back-btn {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            color: #333; 
+            cursor: pointer;
+            padding: 5px;
+            z-index: 10;
+        }
+        
+        /* Admin Video List Styling */
+        .admin-video-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #EEE;
+        }
+        .admin-video-info h4 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .admin-video-info p {
+            margin: 5px 0 0 0;
+            font-size: 0.85em;
+            color: #777;
+        }
+
+        /* --- NEW PROFILE STYLES --- */
+        .compact-profile-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 10px 10px;
+            background-color: #1a1a1a;
+            width: 100%;
+            flex-shrink: 0; /* Ensures it doesn't shrink on vertical space */
+        }
+        
+        /* Profile Icon Wrapper for Edit Icon */
+        .profile-icon-wrapper {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .profile-icon.big {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #E91E63; /* Pink Border */
+            margin-bottom: 0; /* Wrapper handles margin */
+        }
+        
+        /* NEW: Edit Profile Icon */
+        .edit-profile-icon {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background-color: #FFC107; /* Yellow background */
+            color: #000;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px solid #1a1a1a; /* Dark border to separate from background */
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .edit-profile-icon .material-icons {
+            font-size: 18px;
+        }
+
+        .profile-header-stats {
+            display: flex;
+            justify-content: space-around;
+            width: 80%;
+            margin: 10px 0 15px;
+            color: #FFF;
+        }
+        .stat-item {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+        .stat-item strong {
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+        .stat-item span {
+            font-size: 0.8em;
+            color: #AAA;
+        }
+
+        /* Liked History Compact Scroll Area */
+        .scrollable-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0 15px;
+            background-color: #121212;
+        }
+        /* Overrides for no-scroll profile screen */
+        #profile-screen-logged-in {
+            padding: 0;
+            overflow-y: hidden;
+            height: 100%;
+        }
+
+        /* Ensure Log Out button stays at the bottom (SMALLER & YELLOW) */
+        #profile-screen-logged-in button.secondary-btn {
+            margin-top: auto !important; /* Push to bottom */
+            border-radius: 8px; /* Making it small and rounded */
+            background-color: #FFC107; /* Changed to Yellow */
+            color: #000; /* Text color black for contrast */
+            padding: 8px 15px; /* Smaller padding */
+            width: auto; /* Allow it to shrink */
+            align-self: center; /* Center the smaller button */
+            margin-bottom: 10px !important;
+            flex-shrink: 0;
+        }
+        
+        /* Other User Profile Header Style */
+        #other-user-profile-screen .page-header {
+            background-color: #1a1a1a; 
+            border-bottom: none;
+            padding: 15px;
+            flex-shrink: 0;
+        }
+        
+        /* Profile Header back button styling for logged-in screen */
+        #profile-screen-logged-in .page-header {
+            background-color: transparent; 
+            border-bottom: none;
+            width: 100%;
+            padding: 0 15px 10px; 
+            position: relative;
+            margin-bottom: 0;
+        }
+    </style>
+    
+    <script>
+        const App = {}; 
+        let historyStack = ['shorts']; 
+        const ADMIN_PASSWORD = 'ahad71'; 
+        let videoDataCache = {}; 
+        let likedVideoIdsCache = []; 
+        let dislikedVideoIdsCache = []; 
+        let viewedVideoIdsCache = []; 
+        let followingUserIdsCache = []; 
+        let currentPlayingVideoId = null; 
+        
+        App.isCommentModalOpen = false;
+        App.DEFAULT_PROFILE_PIC = 'https://via.placeholder.com/80/E91E63/FFFFFF?text=ME';
+
+        // 1. FIREBASE CONFIGURATION
+        App.initFirebase = () => {
+            const firebaseConfig = {
+                apiKey: "AIzaSyDpwurrGN90Zb_oLO2Z9_uEzO66VaQxZ4w",
+                authDomain: "ecmerce-e222f.firebaseapp.com",
+                databaseURL: "https://ecmerce-e222f-default-rtdb.firebaseio.com",
+                projectId: "ecmerce-e222f",
+                storageBucket: "ecmerce-e222f.firebasestorage.app",
+                messagingSenderId: "1018256070803",
+                appId: "1:1018256070803:web:f110cd9dce5b243bdd5566",
+                measurementId: "G-H1L7KZYFZF"
+            };
+
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                App.auth = firebase.auth();
+                App.db = firebase.firestore();
+                console.log("Firebase initialized and connected.");
+                App.checkAuthState();
+            } else {
+                console.error("Firebase SDK is not loaded. Check the script tags at the top of the file.");
+            }
+        };
+        
+        // Helper to check user's engagement status
+        App.loadUserEngagementStatus = async (user) => {
+            if (!user) {
+                likedVideoIdsCache = [];
+                dislikedVideoIdsCache = []; 
+                viewedVideoIdsCache = [];
+                followingUserIdsCache = []; 
+                return;
+            }
+            try {
+                const userDoc = await App.db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    likedVideoIdsCache = userDoc.data().likedVideos || [];
+                    dislikedVideoIdsCache = userDoc.data().dislikedVideos || []; 
+                    viewedVideoIdsCache = userDoc.data().viewedVideos || [];
+                    followingUserIdsCache = userDoc.data().following || []; 
+                }
+            } catch (error) {
+                console.error("Error loading user status:", error);
+                likedVideoIdsCache = [];
+                dislikedVideoIdsCache = [];
+                viewedVideoIdsCache = [];
+                followingUserIdsCache = [];
+            }
+        };
+
+        // 2. NAVIGATION LOGIC
+        function showScreen(screenId, isBack = false) {
+            
+            if (App.isCommentModalOpen) {
+                 App.hideCommentsScreen();
+            }
+            
+            // PROFILE LOGIC
+            if (screenId === 'profile') {
+                screenId = App.auth.currentUser ? 'profile-screen-logged-in' : 'profile-screen';
+            }
+
+            if (!isBack) {
+                if (historyStack[historyStack.length - 1] !== screenId) {
+                    historyStack.push(screenId);
+                }
+            }
+            
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('screen-active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+
+            const activeScreen = document.getElementById(screenId);
+            
+            const shortsFeedContainer = document.getElementById('shorts-feed-container'); 
+            const actionButtons = document.getElementById('action-buttons-group');
+            
+            if (shortsFeedContainer && actionButtons) {
+                if (screenId === 'shorts') {
+                    shortsFeedContainer.style.display = 'block';
+                    actionButtons.style.display = 'flex';
+                    document.getElementById('shorts-nav').classList.add('active');
+                    
+                    // Reload the current active feed (Default: foryou)
+                    App.loadVideos();
+                    
+                } else {
+                    shortsFeedContainer.style.display = 'none';
+                    actionButtons.style.display = 'none';
+                    
+                    if (currentPlayingVideoId) {
+                        App.stopVideoPlayback(currentPlayingVideoId);
+                    }
+                }
+            }
+            
+            if (activeScreen) activeScreen.classList.add('screen-active');
+
+            if (screenId === 'shorts') document.getElementById('shorts-nav').classList.add('active');
+            else if (screenId.includes('search')) document.getElementById('search-nav').classList.add('active');
+            else if (screenId.includes('profile') || screenId.includes('login') || screenId.includes('register') || screenId.includes('admin') || screenId.includes('other-user-profile')) {
+                document.getElementById('profile-nav').classList.add('active');
+            }
+            
+            if (screenId === 'admin-panel-screen') {
+                App.loadAdminVideos();
+            }
+            
+            if (screenId === 'profile-screen-logged-in') {
+                App.loadMyProfileData(); 
+                App.loadLikedHistory();
+            }
+        }
+
+        function goBack() {
+            if (App.isCommentModalOpen) {
+                App.hideCommentsScreen();
+                return;
+            }
+            
+            if (historyStack.length > 1) {
+                historyStack.pop();
+                const prevScreenId = historyStack[historyStack.length - 1];
+                showScreen(prevScreenId, true);
+            }
+        }
+        
+        // 3. FIREBASE AUTHENTICATION FUNCTIONS
+        App.checkAuthState = () => {
+            App.auth.onAuthStateChanged(async (user) => { 
+                await App.loadUserEngagementStatus(user); 
+
+                if (user) {
+                    const loggedInScreen = document.getElementById('profile-screen-logged-in');
+                    if (loggedInScreen) {
+                        const emailSpan = loggedInScreen.querySelector('#current-user-email');
+                        if (emailSpan) {
+                            emailSpan.textContent = user.email.split('@')[0];
+                        }
+                    }
+                    if (['profile-screen', 'login-screen', 'register-screen', 'admin-login-screen'].includes(historyStack[historyStack.length - 1])) {
+                        showScreen('shorts'); 
+                    }
+                } else {
+                    if (historyStack[historyStack.length - 1] === 'profile-screen-logged-in') {
+                         showScreen('profile-screen');
+                    }
+                }
+            });
+        };
+
+        App.handleLogin = async (event) => {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                await App.auth.signInWithEmailAndPassword(email, password);
+                alert('Login Successful!');
+                App.loadVideos(); // Reload feed after login
+            } catch (error) {
+                alert('Login Failed: ' + error.message);
+            }
+        };
+
+        App.handleRegister = async (event) => {
+            event.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+
+            try {
+                const userCredential = await App.auth.createUserWithEmailAndPassword(email, password);
+                await App.db.collection('users').doc(userCredential.user.uid).set({ 
+                    email: email, 
+                    likedVideos: [], 
+                    dislikedVideos: [], 
+                    viewedVideos: [], 
+                    followers: [], 
+                    following: [], 
+                    profilePictureURL: App.DEFAULT_PROFILE_PIC,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp() 
+                });
+                alert('Registration Successful! You are now logged in.');
+                App.loadVideos(); // Reload feed after registration
+            } catch (error) {
+                alert('Registration Failed: ' + error.message);
+            }
+        };
+
+        App.handleLogout = async () => {
+            await App.auth.signOut();
+            alert('Logged Out!');
+        };
+        
+        // Video stop (shows pause screen)
+        App.stopVideoPlayback = (videoId) => {
+            const container = document.querySelector(`.video-container[data-video-id="${videoId}"] .embed-container`);
+            if (container) {
+                // Clear the content to effectively stop the iframe video
+                container.innerHTML = '<p style="color:white; text-align:center; padding-top: 50%;">Video Paused/Hidden</p>'; 
+            }
+        };
+
+        // Video start (inserts iframe)
+        App.startVideoPlayback = (videoId) => {
+            const container = document.querySelector(`.video-container[data-video-id="${videoId}"] .embed-container`);
+            const videoData = videoDataCache[videoId];
+            if (container && videoData) {
+                // Ensure the video container is empty before inserting the embed code
+                container.innerHTML = ''; 
+                // CRITICAL: This is where the video must be a valid <iframe>
+                container.innerHTML = videoData.embedURL; 
+            }
+        };
+        
+        App.trackView = async (videoId) => {
+            const user = App.auth.currentUser;
+            if (!user) return; 
+
+            if (viewedVideoIdsCache.includes(videoId)) {
+                return; 
+            }
+
+            viewedVideoIdsCache.push(videoId); 
+
+            try {
+                const videoRef = App.db.collection('videos').doc(videoId);
+                const userRef = App.db.collection('users').doc(user.uid);
+
+                await videoRef.update({ 
+                    viewCount: firebase.firestore.FieldValue.increment(1) 
+                });
+
+                await userRef.update({
+                    viewedVideos: firebase.firestore.FieldValue.arrayUnion(videoId)
+                });
+                
+                const countDisplayInOverlay = document.querySelector(`.top-left-stats .view-count[data-video-id="${videoId}"]`);
+                if (countDisplayInOverlay) {
+                    let currentCount = parseInt(countDisplayInOverlay.textContent);
+                    currentCount += 1;
+                    countDisplayInOverlay.textContent = currentCount;
+                }
+
+            } catch (error) {
+                console.error("Error tracking view:", error);
+                viewedVideoIdsCache = viewedVideoIdsCache.filter(id => id !== videoId); 
+            }
+        };
+
+        // App.switchFeed removed as tabs are removed.
+        
+        // 4. FIRESTORE DATA FUNCTIONS (Shorts Feed)
+        
+        App.updateShortsActionButtons = (videoId) => {
+            const actionButtons = document.getElementById('action-buttons-group');
+            const videoData = videoDataCache[videoId];
+            const isLiked = likedVideoIdsCache.includes(videoId);
+            const isDisliked = dislikedVideoIdsCache.includes(videoId);
+            
+            if (actionButtons && videoData) {
+                actionButtons.innerHTML = `
+                    <button class="action-btn like-btn" onclick="App.handleLike(this)" data-video-id="${videoId}">
+                        <span class="material-symbols-outlined like-icon ${isLiked ? 'liked' : ''}">thumb_up</span>
+                        <span>${videoData.likeCount || 0}</span>
+                    </button>
+                    <button class="action-btn dislike-btn" onclick="App.handleDislike(this)" data-video-id="${videoId}">
+                        <span class="material-symbols-outlined dislike-icon ${isDisliked ? 'disliked' : ''}">thumb_down</span>
+                        <span>${videoData.dislikeCount || 0}</span>
+                    </button>
+                    <button class="action-btn comment-btn" onclick="App.showCommentsScreen('${videoId}')">
+                        <span class="material-symbols-outlined comment-icon-btn">comment</span>
+                        <span>${videoData.commentCount || 0}</span>
+                    </button>
+                    <button class="action-btn share-btn" onclick="App.handleShare(this)">
+                        <span class="material-symbols-outlined share-icon-btn">share</span>
+                        <span>Share</span>
+                    </button>
+                `;
+            }
+        };
+
+        // App.loadVideos now only loads the 'For You' feed (latest videos)
+        App.loadVideos = async () => {
+            try {
+                videoDataCache = {}; 
+                
+                const shortsFeedList = document.getElementById('shorts-feed-list'); 
+                if (!shortsFeedList) return;
+
+                shortsFeedList.innerHTML = '<div class="video-container"><div class="embed-container"><p style="color:white; text-align:center; padding-top: 50%;">Loading feed...</p></div></div>'; 
+                
+                const actionButtons = document.getElementById('action-buttons-group');
+                actionButtons.innerHTML = '';
+                
+                // Query always for the latest videos (For You equivalent)
+                const query = App.db.collection('videos').orderBy('uploadDate', 'desc').limit(20);
+
+                const snapshot = await query.get();
+                
+                shortsFeedList.innerHTML = '';
+                
+                let firstVideoId = null;
+
+                if (snapshot.empty) {
+                     shortsFeedList.innerHTML = '<div class="video-container"><div class="video-overlay"><div class="bottom-info" style="justify-content: center; align-items: center; height: 100%;"><h2 style="text-align:center;">No videos available in this feed.</h2></div></div></div>';
+                     currentPlayingVideoId = null;
+                     return;
+                }
+
+                snapshot.forEach((doc, index) => {
+                    const videoData = doc.data();
+                    const videoId = doc.id;
+                    
+                    // --- UPLOADER DATA (PLACEHOLDER/REAL) ---
+                    const uploaderEmail = videoData.uploaderEmail || 'demo-uploader@app.com';
+                    const uploaderId = videoData.uploaderId || 'PLACEHOLDER_UID_' + videoId.substring(0, 5); 
+                    
+                    const username = uploaderEmail.split('@')[0];
+                    const profileInitial = username.charAt(0).toUpperCase();
+                    const isFollowing = followingUserIdsCache.includes(uploaderId);
+                    const followButtonText = isFollowing ? 'Following' : 'Follow';
+                    const followButtonClass = isFollowing ? 'following' : '';
+                    
+                    // Use uploader's profile picture if available, otherwise use initial
+                    const profilePicSrc = videoData.uploaderProfilePic || `https://via.placeholder.com/30/E91E63/FFFFFF?text=${profileInitial}`;
+                    // --------------------------------------------------------
+                    
+                    videoDataCache[videoId] = { 
+                        ...videoData, 
+                        id: videoId, 
+                        likeCount: videoData.likeCount || 0,
+                        dislikeCount: videoData.dislikeCount || 0, 
+                        commentCount: videoData.commentCount || 0,
+                        viewCount: videoData.viewCount || 0,
+                        uploaderId: uploaderId
+                    }; 
+                    
+                    const realViewCount = videoDataCache[videoId].viewCount; 
+                    
+                    // NEW: Profile icon now calls viewUserProfile
+                    const profileIconHTML = `
+                        <img class="user-profile-icon" 
+                             src="${profilePicSrc}" 
+                             onerror="this.onerror=null;this.src='https://via.placeholder.com/30/E91E63/FFFFFF?text=${profileInitial}'"
+                             onclick="viewUserProfile('${uploaderId}', '@${username}', event)" 
+                             alt="Profile Icon">
+                    `;
+
+                    const videoHTML = `
+                        <div class="video-container" data-video-id="${videoId}">
+                            <div class="embed-container">
+                                <p style="color:white; text-align:center; padding-top: 50%;">Loading video...</p>
+                            </div>
+                            <div class="video-overlay">
+                                <div class="top-left-stats">
+                                    <div class="stat-group">
+                                        <span class="material-icons">visibility</span>
+                                        <span class="view-count" data-video-id="${videoId}">${realViewCount}</span>
+                                    </div>
+                                </div>
+                                <div class="bottom-info">
+                                    <div class="user-info-group">
+                                        ${profileIconHTML}
+                                        <span class="username-text">@${username}</span>
+                                        <button class="follow-btn ${followButtonClass}" onclick="App.handleFollow(this, '${uploaderId}')" data-uploader-id="${uploaderId}" ${App.auth.currentUser && App.auth.currentUser.uid === uploaderId ? 'disabled' : ''} > 
+                                            ${followButtonText} 
+                                        </button>
+                                    </div>
+                                    <h2>${videoData.title}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    shortsFeedList.insertAdjacentHTML('beforeend', videoHTML);
+                    if (index === 0) {
+                        firstVideoId = videoId;
+                        currentPlayingVideoId = videoId;
+                    }
+                });
+
+                if (firstVideoId) {
+                    const shortsFeed = document.getElementById('shorts-feed-container');
+                    if (shortsFeed) {
+                        shortsFeed.scrollTop = 0;
+                    }
+                    App.startVideoPlayback(firstVideoId);
+                    App.trackView(firstVideoId);
+                    App.updateShortsActionButtons(firstVideoId);
+                }
+
+            } catch (error) {
+                console.error("Error loading videos:", error);
+                const shortsFeed = document.getElementById('shorts-feed-list');
+                if(shortsFeed) shortsFeed.innerHTML = '<div class="video-container"><div class="embed-container"><p style="color:red; text-align:center; padding-top: 50%;">Error loading videos: ' + error.message + '</p></div></div>';
+            }
+        };
+
+        // --- FOLLOW LOGIC ---
+        App.handleFollow = async (button, uploaderId) => {
+            const user = App.auth.currentUser;
+            const isFollowing = followingUserIdsCache.includes(uploaderId);
+
+            if (!user) {
+                alert('You must be logged in to follow a user!');
+                showScreen('login-screen');
+                return;
+            }
+
+            if (user.uid === uploaderId) {
+                alert('You cannot follow yourself!');
+                return;
+            }
+
+            if (uploaderId.startsWith('PLACEHOLDER_UID_')) {
+                alert("Follow feature is active, but the uploader's profile is a placeholder in this demo video. It won't update the database.");
+                return;
+            }
+
+            const userRef = App.db.collection('users').doc(user.uid);
+            const uploaderRef = App.db.collection('users').doc(uploaderId);
+
+            button.disabled = true;
+
+            try {
+                if (isFollowing) {
+                    // Unfollow
+                    await userRef.update({ 
+                        following: firebase.firestore.FieldValue.arrayRemove(uploaderId)
+                    });
+                    await uploaderRef.update({
+                        followers: firebase.firestore.FieldValue.arrayRemove(user.uid)
+                    });
+                    
+                    followingUserIdsCache = followingUserIdsCache.filter(id => id !== uploaderId);
+
+                    // Update UI instantly on all relevant buttons
+                    document.querySelectorAll(`.follow-btn[data-uploader-id="${uploaderId}"]`).forEach(btn => {
+                        btn.textContent = 'Follow';
+                        btn.classList.remove('following');
+                    });
+
+                } else {
+                    // Follow
+                    await userRef.update({ 
+                        following: firebase.firestore.FieldValue.arrayUnion(uploaderId)
+                    });
+                    await uploaderRef.update({
+                        followers: firebase.firestore.FieldValue.arrayUnion(user.uid)
+                    });
+                    
+                    followingUserIdsCache.push(uploaderId);
+                    
+                    // Update UI instantly on all relevant buttons
+                    document.querySelectorAll(`.follow-btn[data-uploader-id="${uploaderId}"]`).forEach(btn => {
+                        btn.textContent = 'Following';
+                        btn.classList.add('following');
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error updating follow status:", error);
+                alert('Follow/Unfollow failed: ' + error.message);
+            } finally {
+                button.disabled = false;
+            }
+        };
+        // --- END FOLLOW LOGIC ---
+
+        App.handleLike = async (button) => {
+            const user = App.auth.currentUser;
+            const videoId = button.getAttribute('data-video-id');
+            const likeIcon = button.querySelector('.like-icon');
+            const dislikeIcon = document.querySelector(`.dislike-btn[data-video-id="${videoId}"] .dislike-icon`);
+            const countDisplayInButton = button.querySelector('span:last-child');
+            const dislikeCountDisplay = document.querySelector(`.dislike-btn[data-video-id="${videoId}"] span:last-child`);
+
+            if (!user) {
+                alert('You must be logged in to like a video!');
+                showScreen('login-screen');
+                return;
+            }
+
+            if (!videoId) {
+                alert('No video loaded to like.');
+                return;
+            }
+
+            const videoRef = App.db.collection('videos').doc(videoId);
+            const userRef = App.db.collection('users').doc(user.uid);
+
+            const isCurrentlyLiked = likedVideoIdsCache.includes(videoId);
+            const isCurrentlyDisliked = dislikedVideoIdsCache.includes(videoId);
+
+            try {
+                if (isCurrentlyLiked) {
+                    // User already liked, so unlike
+                    likeIcon.classList.remove('liked');
+                    likedVideoIdsCache = likedVideoIdsCache.filter(id => id !== videoId);
+                    let currentCount = parseInt(countDisplayInButton.textContent);
+                    currentCount = Math.max(0, currentCount - 1);
+                    countDisplayInButton.textContent = currentCount;
+                    if (videoDataCache[videoId]) videoDataCache[videoId].likeCount = currentCount;
+
+                    await userRef.update({ 
+                        likedVideos: firebase.firestore.FieldValue.arrayRemove(videoId)
+                    });
+                    await videoRef.update({
+                        likeCount: firebase.firestore.FieldValue.increment(-1)
+                    });
+
+                } else {
+                    // User is liking
+                    likeIcon.classList.add('liked');
+                    likedVideoIdsCache.push(videoId);
+                    let currentCount = parseInt(countDisplayInButton.textContent);
+                    currentCount += 1;
+                    countDisplayInButton.textContent = currentCount;
+                    if (videoDataCache[videoId]) videoDataCache[videoId].likeCount = currentCount;
+
+                    await userRef.update({ 
+                        likedVideos: firebase.firestore.FieldValue.arrayUnion(videoId)
+                    });
+                    await videoRef.update({
+                        likeCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                    
+                    // If previously disliked, remove dislike
+                    if (isCurrentlyDisliked) {
+                        dislikeIcon.classList.remove('disliked');
+                        dislikedVideoIdsCache = dislikedVideoIdsCache.filter(id => id !== videoId);
+                        let currentDislikeCount = parseInt(dislikeCountDisplay.textContent);
+                        currentDislikeCount = Math.max(0, currentDislikeCount - 1);
+                        dislikeCountDisplay.textContent = currentDislikeCount;
+                        if (videoDataCache[videoId]) videoDataCache[videoId].dislikeCount = currentDislikeCount;
+
+                        await userRef.update({ 
+                            dislikedVideos: firebase.firestore.FieldValue.arrayRemove(videoId)
+                        });
+                        await videoRef.update({
+                            dislikeCount: firebase.firestore.FieldValue.increment(-1)
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Error updating like count or user profile:", error);
+                alert('Like action failed: ' + error.message);
+                // Revert UI on error
+                likeIcon.classList.toggle('liked');
+            }
+        };
+
+        App.handleDislike = async (button) => {
+            const user = App.auth.currentUser;
+            const videoId = button.getAttribute('data-video-id');
+            const dislikeIcon = button.querySelector('.dislike-icon');
+            const likeIcon = document.querySelector(`.like-btn[data-video-id="${videoId}"] .like-icon`);
+            const countDisplayInButton = button.querySelector('span:last-child');
+            const likeCountDisplay = document.querySelector(`.like-btn[data-video-id="${videoId}"] span:last-child`);
+
+            if (!user) {
+                alert('You must be logged in to dislike a video!');
+                showScreen('login-screen');
+                return;
+            }
+
+            if (!videoId) {
+                alert('No video loaded to dislike.');
+                return;
+            }
+
+            const videoRef = App.db.collection('videos').doc(videoId);
+            const userRef = App.db.collection('users').doc(user.uid);
+
+            const isCurrentlyDisliked = dislikedVideoIdsCache.includes(videoId);
+            const isCurrentlyLiked = likedVideoIdsCache.includes(videoId);
+
+            try {
+                if (isCurrentlyDisliked) {
+                    // User already disliked, so undislike
+                    dislikeIcon.classList.remove('disliked');
+                    dislikedVideoIdsCache = dislikedVideoIdsCache.filter(id => id !== videoId);
+                    let currentCount = parseInt(countDisplayInButton.textContent);
+                    currentCount = Math.max(0, currentCount - 1);
+                    countDisplayInButton.textContent = currentCount;
+                    if (videoDataCache[videoId]) videoDataCache[videoId].dislikeCount = currentCount;
+
+                    await userRef.update({ 
+                        dislikedVideos: firebase.firestore.FieldValue.arrayRemove(videoId)
+                    });
+                    await videoRef.update({
+                        dislikeCount: firebase.firestore.FieldValue.increment(-1)
+                    });
+
+                } else {
+                    // User is disliking
+                    dislikeIcon.classList.add('disliked');
+                    dislikedVideoIdsCache.push(videoId);
+                    let currentCount = parseInt(countDisplayInButton.textContent);
+                    currentCount += 1;
+                    countDisplayInButton.textContent = currentCount;
+                    if (videoDataCache[videoId]) videoDataCache[videoId].dislikeCount = currentCount;
+
+                    await userRef.update({ 
+                        dislikedVideos: firebase.firestore.FieldValue.arrayUnion(videoId)
+                    });
+                    await videoRef.update({
+                            dislikeCount: firebase.firestore.FieldValue.increment(1)
+                        });
+
+                    // If previously liked, remove like
+                    if (isCurrentlyLiked) {
+                        likeIcon.classList.remove('liked');
+                        likedVideoIdsCache = likedVideoIdsCache.filter(id => id !== videoId);
+                        let currentLikeCount = parseInt(likeCountDisplay.textContent);
+                        currentLikeCount = Math.max(0, currentLikeCount - 1);
+                        likeCountDisplay.textContent = currentLikeCount;
+                        if (videoDataCache[videoId]) videoDataCache[videoId].likeCount = currentLikeCount;
+
+                        await userRef.update({ 
+                            likedVideos: firebase.firestore.FieldValue.arrayRemove(videoId)
+                        });
+                        await videoRef.update({
+                            likeCount: firebase.firestore.FieldValue.increment(-1)
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Error updating dislike count or user profile:", error);
+                alert('Dislike action failed: ' + error.message);
+                // Revert UI on error
+                dislikeIcon.classList.toggle('disliked');
+            }
+        };
+
+        App.handleShare = (button) => {
+            const tempInput = document.createElement("input");
+            tempInput.value = "Check out this short! [Link to App]"; 
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            alert("Share link copied to clipboard!");
+        };
+
+        // Handles video playback on scroll
+        App.handleScroll = () => {
+            const feed = document.getElementById('shorts-feed-container');
+            const videoContainers = feed.querySelectorAll('.video-container');
+            const feedHeight = feed.clientHeight;
+            let visibleVideoId = null;
+
+            for (let i = 0; i < videoContainers.length; i++) {
+                const container = videoContainers[i];
+                const rect = container.getBoundingClientRect();
+                
+                // Checks if the video is centered (or mostly visible) on the screen
+                if (rect.top >= -feedHeight / 3 && rect.top <= feedHeight / 3) {
+                    visibleVideoId = container.getAttribute('data-video-id');
+                    break;
+                }
+            }
+
+            if (visibleVideoId && visibleVideoId !== currentPlayingVideoId) {
+                if (currentPlayingVideoId) {
+                    App.stopVideoPlayback(currentPlayingVideoId);
+                }
+                currentPlayingVideoId = visibleVideoId;
+                App.startVideoPlayback(currentPlayingVideoId);
+                App.trackView(currentPlayingVideoId);
+                App.updateShortsActionButtons(visibleVideoId);
+            }
+        };
+
+        App.openVideoFromSearch = (videoId) => {
+            showScreen('shorts');
+            
+            setTimeout(() => {
+                const targetContainer = document.querySelector(`.video-container[data-video-id="${videoId}"]`);
+                const feed = document.getElementById('shorts-feed-container');
+
+                if (targetContainer && feed) {
+                    // Scroll to the target video
+                    feed.scrollTop = targetContainer.offsetTop;
+                    
+                    // Trigger handleScroll to start playback and update buttons
+                    setTimeout(App.handleScroll, 200);
+                } else {
+                    alert('Video not found in the feed. Please try reloading the main page.');
+                }
+            }, 100);
+        };
+        
+        // --- PROFILE MANAGEMENT ---
+
+        // NEW: Function to prompt and update profile picture
+        App.promptProfilePic = () => {
+            const newPicLink = prompt("Please paste the PNG/Image Link (URL) for your new profile picture:");
+            if (newPicLink) {
+                // Simplified URL validation (must start with http/https)
+                if (newPicLink.startsWith('http')) {
+                    App.handleProfilePicUpdate(newPicLink.trim());
+                } else {
+                    alert("Invalid link. Please ensure the link starts with 'http' or 'https'.");
+                }
+            }
+        };
+
+        // NEW: Function to save profile picture link to Firebase
+        App.handleProfilePicUpdate = async (imageUrl) => {
+            const user = App.auth.currentUser;
+            if (!user) return;
+            
+            try {
+                // Update user document with the new image URL
+                await App.db.collection('users').doc(user.uid).update({ 
+                    profilePictureURL: imageUrl
+                });
+                alert('Profile picture updated successfully!');
+                
+                // Update UI immediately
+                document.getElementById('my-profile-icon').src = imageUrl;
+            } catch (error) {
+                console.error("Error updating profile picture:", error);
+                alert('Failed to update profile picture: ' + error.message);
+            }
+        };
+
+
+        // Function to view another user's profile
+        async function viewUserProfile(uploaderId, username, event) {
+            if (event) event.stopPropagation(); // Prevent video controls from being activated
+            
+            // Check if user is logged in
+            if (!App.auth.currentUser) {
+                alert('You must be logged in to view profiles.');
+                showScreen('login-screen');
+                return;
+            }
+            
+            document.getElementById('other-user-name').textContent = username;
+
+            try {
+                const userDoc = await App.db.collection('users').doc(uploaderId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    
+                    // Set counts
+                    document.getElementById('other-follower-count').textContent = (userData.followers ? userData.followers.length : 0);
+                    document.getElementById('other-following-count').textContent = (userData.following ? userData.following.length : 0);
+
+                    // Fetch total likes for all of this user's videos
+                    const userVideos = await App.db.collection('videos').where('uploaderId', '==', uploaderId).get();
+                    let totalLikes = 0;
+                    userVideos.forEach(doc => {
+                        totalLikes += doc.data().likeCount || 0;
+                    });
+                    document.getElementById('other-like-count').textContent = totalLikes;
+                    
+                    // Set profile icon placeholder or actual pic
+                    const initial = username.replace('@', '').charAt(0).toUpperCase();
+                    const otherProfilePic = userData.profilePictureURL || `https://via.placeholder.com/80/0000FF/FFFFFF?text=${initial}`;
+                    document.getElementById('other-profile-icon').src = otherProfilePic;
+                    
+                } else {
+                    // Placeholder data for users not in Firestore
+                    document.getElementById('other-follower-count').textContent = '100+';
+                    document.getElementById('other-following-count').textContent = '50+';
+                    document.getElementById('other-like-count').textContent = '1K+';
+                    const initial = username.replace('@', '').charAt(0).toUpperCase();
+                    document.getElementById('other-profile-icon').src = `https://via.placeholder.com/80/0000FF/FFFFFF?text=${initial}`;
+                }
+            } catch (error) {
+                console.error("Error fetching other user profile:", error);
+            }
+
+            showScreen('other-user-profile-screen');
+        }
+
+
+        // Modified Function to handle video upload (REMOVED YOUTUBE VALIDATION)
+        App.handleVideoUpload = async (event) => {
+            event.preventDefault();
+            const user = App.auth.currentUser;
+            if (!user) {
+                alert('You must be logged in to upload a video!');
+                return;
+            }
+            
+            const title = document.getElementById('video-title').value;
+            const embedLink = document.getElementById('video-embed-link').value;
+            
+            // --- REMOVING YOUTUBE ONLY VALIDATION (Allows all embed links) ---
+            if (!embedLink.startsWith('http')) {
+                alert('Please use a valid Embed Link (must start with http:// or https://) from any platform.');
+                return;
+            }
+            // --- VALIDATION MODIFIED ---
+            
+            try {
+                const userDoc = await App.db.collection('users').doc(user.uid).get();
+                const userData = userDoc.data();
+
+                await App.db.collection('videos').add({
+                    title: title,
+                    // The iframe should be created from *any* valid embed link
+                    embedURL: `<iframe width="100%" height="100%" src="${embedLink}" frameborder="0" allow="autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`,
+                    uploaderId: user.uid,
+                    uploaderEmail: user.email,
+                    uploaderProfilePic: userData.profilePictureURL || null, // Save uploader's current profile picture
+                    likeCount: 0,
+                    dislikeCount: 0,
+                    commentCount: 0,
+                    viewCount: 0,
+                    uploadDate: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                alert('Video uploaded successfully!');
+                document.getElementById('upload-video-form').reset(); // Clear form
+                showScreen('profile'); // Go back to profile screen
+                
+            } catch (error) {
+                alert('Video upload failed: ' + error.message);
+                console.error("Upload error:", error);
+            }
+        };
+
+        // Modified function to load profile stats (NOW INCLUDES PROFILE PIC)
+        App.loadMyProfileData = async () => {
+            const user = App.auth.currentUser;
+            if (!user) return;
+            
+            try {
+                const userDoc = await App.db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    
+                    // NEW: Set Profile Picture
+                    const profileIcon = document.getElementById('my-profile-icon');
+                    if (profileIcon) {
+                        profileIcon.src = userData.profilePictureURL || App.DEFAULT_PROFILE_PIC;
+                    }
+                    
+                    // Update Profile Stats
+                    document.getElementById('my-follower-count').textContent = (userData.followers ? userData.followers.length : 0);
+                    document.getElementById('my-following-count').textContent = (userData.following ? userData.following.length : 0);
+                    
+                    // Fetch total likes for user's videos
+                    const userVideos = await App.db.collection('videos').where('uploaderId', '==', user.uid).get();
+                    let totalLikes = 0;
+                    userVideos.forEach(doc => {
+                        totalLikes += doc.data().likeCount || 0;
+                    });
+                    document.getElementById('my-like-count').textContent = totalLikes;
+                    
+                    // Update email/name display
+                    const emailSpan = document.getElementById('current-user-email');
+                    if (emailSpan) {
+                        emailSpan.textContent = user.email.split('@')[0];
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading profile data:", error);
+            }
+        };
+
+        App.loadLikedHistory = async () => {
+            const user = App.auth.currentUser;
+            const listElement = document.getElementById('liked-history-list');
+            listElement.innerHTML = '<li>Loading...</li>';
+
+            if (!user) {
+                listElement.innerHTML = '<li style="color: #FFC107;">Log in to see your liked videos.</li>';
+                return;
+            }
+
+            try {
+                const userDoc = await App.db.collection('users').doc(user.uid).get();
+                if (!userDoc.exists) {
+                    listElement.innerHTML = '<li style="color: #FFC107;">User profile not found.</li>';
+                    return;
+                }
+
+                const likedVideoIds = userDoc.data().likedVideos || [];
+                likedVideoIdsCache = likedVideoIds;
+
+                if (likedVideoIds.length === 0) {
+                    listElement.innerHTML = '<li style="color: #AAA;">You haven\'t liked any videos yet!</li>';
+                    return;
+                }
+
+                // Fetch details for the last 10 liked videos
+                const videoSnapshot = await App.db.collection('videos').where(firebase.firestore.FieldPath.documentId(), 'in', likedVideoIds.slice(0, 10)).get();
+                
+                listElement.innerHTML = ''; 
+                videoSnapshot.forEach(doc => {
+                    const videoData = doc.data();
+                    listElement.insertAdjacentHTML('beforeend', `<li style="padding: 5px 0; border-bottom: 1px dashed #333; margin-bottom: 5px;">${videoData.title} (Likes: ${videoData.likeCount || 0})</li>`);
+                });
+
+            } catch (error) {
+                console.error("Error loading liked history:", error);
+                listElement.innerHTML = `<li style="color: red;">Error loading history: ${error.message}</li>`;
+            }
+        }
+        // --- END PROFILE MANAGEMENT ---
+        
+        App.handleSearch = async () => {
+            const searchInput = document.getElementById('search-input-field');
+            const queryText = searchInput.value.trim();
+            const resultsList = document.getElementById('search-results-list');
+
+            resultsList.innerHTML = '';
+
+            if (queryText.length < 2) {
+                resultsList.innerHTML = '<li>Please enter at least 2 characters.</li>';
+                return;
+            }
+
+            resultsList.innerHTML = '<li>Searching...</li>';
+            
+            try {
+                // Perform a simple title search (case-insensitive, basic match)
+                // Note: Firestore does not support robust text search. This implementation only searches for exact starts/matches.
+                const querySnapshot = await App.db.collection('videos')
+                    .orderBy('title')
+                    .startAt(queryText)
+                    .endAt(queryText + '\uf8ff') 
+                    .limit(20)
+                    .get();
+
+                resultsList.innerHTML = '';
+
+                if (querySnapshot.empty) {
+                    resultsList.innerHTML = '<li>No videos found matching your search.</li>';
+                    return;
+                }
+
+                querySnapshot.forEach(doc => {
+                    const video = doc.data();
+                    const videoId = doc.id;
+                    const uploaderName = video.uploaderEmail ? video.uploaderEmail.split('@')[0] : 'Unknown';
+
+                    resultsList.insertAdjacentHTML('beforeend', `
+                        <li class="search-result-item" onclick="App.openVideoFromSearch('${videoId}')">
+                            <h4>${video.title}</h4>
+                            <p>Uploader: @${uploaderName} | Views: ${video.viewCount || 0}</p>
+                        </li>
+                    `);
+                });
+
+            } catch (error) {
+                console.error("Search failed:", error);
+                resultsList.innerHTML = `<li>Error during search: ${error.message}</li>`;
+            }
+        };
+
+
+        // --- COMMENT LOGIC ---
+        App.showCommentsScreen = async (videoId) => {
+            if (!App.auth.currentUser) {
+                alert('You must be logged in to view comments!');
+                showScreen('login-screen');
+                return;
+            }
+
+            App.isCommentModalOpen = true;
+            const commentScreen = document.getElementById('comment-screen');
+            commentScreen.classList.add('screen-active');
+            commentScreen.setAttribute('data-video-id', videoId);
+            document.getElementById('comment-count-header').textContent = `Comments (${videoDataCache[videoId].commentCount || 0})`;
+            document.getElementById('comment-text-input').value = '';
+
+            await App.loadComments(videoId);
+        };
+        
+        App.hideCommentsScreen = () => {
+            App.isCommentModalOpen = false;
+            const commentScreen = document.getElementById('comment-screen');
+            commentScreen.classList.remove('screen-active');
+            commentScreen.removeAttribute('data-video-id');
+        };
+
+        App.loadComments = async (videoId) => {
+            const commentsList = document.getElementById('comments-list');
+            commentsList.innerHTML = '<li>Loading comments...</li>';
+
+            try {
+                const snapshot = await App.db.collection('videos').doc(videoId).collection('comments').orderBy('timestamp', 'desc').limit(50).get();
+                commentsList.innerHTML = ''; 
+
+                if (snapshot.empty) {
+                    commentsList.innerHTML = '<li style="color:#777;">No comments yet. Be the first!</li>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const comment = doc.data();
+                    const username = (comment.userEmail || 'Anon').split('@')[0];
+                    const avatarInitial = username.charAt(0).toUpperCase();
+                    const timestamp = comment.timestamp ? new Date(comment.timestamp.toDate()).toLocaleString() : 'Just now';
+
+                    commentsList.insertAdjacentHTML('beforeend', `
+                        <li class="comment-item">
+                            <div class="comment-avatar">${avatarInitial}</div>
+                            <div class="comment-content">
+                                <div class="comment-user-line">
+                                    <span class="comment-user">@${username}</span>
+                                    <span class="comment-timestamp">${timestamp}</span>
+                                </div>
+                                <p class="comment-text">${comment.text}</p>
+                            </div>
+                        </li>
+                    `);
+                });
+
+            } catch (error) {
+                console.error("Error loading comments:", error);
+                commentsList.innerHTML = `<li>Error loading comments: ${error.message}</li>`;
+            }
+        };
+
+        App.handleCommentSubmit = async (event) => {
+            event.preventDefault();
+            const user = App.auth.currentUser;
+            const videoId = document.getElementById('comment-screen').getAttribute('data-video-id');
+            const commentInput = document.getElementById('comment-text-input');
+            const commentText = commentInput.value.trim();
+            const commentsList = document.getElementById('comments-list');
+
+            if (!user || !videoId || !commentText) return;
+
+            commentInput.value = ''; // Clear input immediately
+            commentInput.disabled = true;
+
+            try {
+                // Add the comment
+                await App.db.collection('videos').doc(videoId).collection('comments').add({
+                    userId: user.uid,
+                    userEmail: user.email,
+                    text: commentText,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Update the comment count on the video document
+                const videoRef = App.db.collection('videos').doc(videoId);
+                await videoRef.update({
+                    commentCount: firebase.firestore.FieldValue.increment(1)
+                });
+                
+                // Update local cache and UI count (for the current video in the feed)
+                if (videoDataCache[videoId]) {
+                     videoDataCache[videoId].commentCount += 1;
+                     document.querySelector(`.comment-btn[data-video-id="${videoId}"] span:last-child`).textContent = videoDataCache[videoId].commentCount;
+                     document.getElementById('comment-count-header').textContent = `Comments (${videoDataCache[videoId].commentCount})`;
+                }
+
+                // Reload comments to show the new one
+                await App.loadComments(videoId);
+
+            } catch (error) {
+                console.error("Error submitting comment:", error);
+                alert('Comment submission failed: ' + error.message);
+                commentInput.value = commentText; // Restore text on failure
+            } finally {
+                commentInput.disabled = false;
+            }
+        };
+
+        // --- ADMIN LOGIC (Existing) ---
+        App.handleAdminLogin = async (event) => {
+            event.preventDefault();
+            const password = document.getElementById('admin-password').value;
+            if (password === ADMIN_PASSWORD) {
+                showScreen('admin-panel-screen');
+            } else {
+                alert('Incorrect Admin Password!');
+            }
+        };
+        
+        App.loadAdminVideos = async () => {
+             const listElement = document.getElementById('admin-video-list');
+             listElement.innerHTML = '<li>Loading videos...</li>';
+
+             try {
+                const snapshot = await App.db.collection('videos').orderBy('uploadDate', 'desc').limit(50).get();
+                listElement.innerHTML = ''; 
+
+                if (snapshot.empty) {
+                    listElement.innerHTML = '<li>No videos found.</li>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const video = doc.data();
+                    const videoId = doc.id;
+                    const uploaderName = video.uploaderEmail ? video.uploaderEmail.split('@')[0] : 'Unknown';
+
+                    listElement.insertAdjacentHTML('beforeend', `
+                        <li class="admin-video-item">
+                            <div class="admin-video-info">
+                                <h4>${video.title}</h4>
+                                <p>Uploader: @${uploaderName} | Likes: ${video.likeCount || 0} | Views: ${video.viewCount || 0}</p>
+                            </div>
+                            <div class="admin-video-actions">
+                                <button class="app-btn delete-btn" onclick="App.deleteVideo('${videoId}')">Delete</button>
+                            </div>
+                        </li>
+                    `);
+                });
+
+            } catch (error) {
+                console.error("Error loading admin videos:", error);
+                listElement.innerHTML = `<li>Error loading videos: ${error.message}</li>`;
+            }
+        };
+
+        App.deleteVideo = async (videoId) => {
+            if (!confirm('Are you sure you want to delete this video? This action is permanent and will remove all likes/comments associated with it.')) {
+                return;
+            }
+
+            try {
+                // Delete the video document
+                await App.db.collection('videos').doc(videoId).delete();
+
+                // Reload the admin list
+                App.loadAdminVideos();
+                
+                alert('Video deleted successfully.');
+
+            } catch (error) {
+                console.error("Error deleting video:", error);
+                alert('Deletion failed: ' + error.message);
+            }
+        };
+        
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            App.initFirebase();
+            
+            // Set up scroll listener for the shorts feed
+            const feed = document.getElementById('shorts-feed-container');
+            if (feed) {
+                feed.addEventListener('scroll', App.handleScroll);
+            }
+            
+            // Default to 'shorts' screen on load
+            showScreen('shorts'); 
+        });
+
+    </script>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <div id="top-tabs-container" class="top-tabs-container" style="display: none !important;">
+        </div>
+
+
+        <div id="shorts-feed-container" class="shorts-feed screen-active" style="display: block;">
+            <ul id="shorts-feed-list" style="list-style: none; padding: 0; margin: 0;">
+                </ul>
+        </div>
+
+        <div id="action-buttons-group" class="action-buttons" style="display: flex;">
+            </div>
+
+
+        <div id="login-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Log In</h1>
+            </header>
+            <form class="form-container" onsubmit="App.handleLogin(event)">
+                <input type="email" id="login-email" class="input-field" placeholder="Email" required>
+                <input type="password" id="login-password" class="input-field" placeholder="Password" required>
+                <button type="submit" class="app-btn primary-btn">LOG IN</button>
+                <button type="button" class="app-btn secondary-btn" onclick="showScreen('register-screen')">Create Account</button>
+                <button type="button" class="app-btn secondary-btn" onclick="showScreen('admin-login-screen')" style="margin-top: 50px;">Admin Login</button>
+            </form>
+        </div>
+
+        <div id="register-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Create Account</h1>
+            </header>
+            <form class="form-container" onsubmit="App.handleRegister(event)">
+                <input type="email" id="register-email" class="input-field" placeholder="Email" required>
+                <input type="password" id="register-password" class="input-field" placeholder="Password (min 6 characters)" required>
+                <button type="submit" class="app-btn primary-btn">REGISTER</button>
+            </form>
+        </div>
+
+        <div id="admin-login-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Admin Login</h1>
+            </header>
+            <form class="form-container" onsubmit="App.handleAdminLogin(event)">
+                <input type="password" id="admin-password" class="input-field" placeholder="Admin Password" required>
+                <button type="submit" class="app-btn primary-btn">LOGIN AS ADMIN</button>
+            </form>
+        </div>
+
+        <div id="admin-panel-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Admin Panel</h1>
+            </header>
+            <h3 style="margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #EEE;">Video List (Last 50)</h3>
+            <ul id="admin-video-list">
+                </ul>
+        </div>
+
+
+        <div id="search-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Search Shorts</h1>
+            </header>
+            <div class="search-input-area" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <input type="search" id="search-input-field" class="input-field" placeholder="Search by video title..." style="margin-bottom: 0;">
+                <button type="button" class="app-btn primary-btn" onclick="App.handleSearch()" style="width: 100px; margin: 0;">Search</button>
+            </div>
+            
+            <h3 style="margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #EEE;">Results</h3>
+            <ul id="search-results-list" style="list-style: none; padding: 0;">
+                <li>Search for videos by title.</li>
+            </ul>
+        </div>
+
+        <div id="upload-video-screen" class="screen" style="background-color: #F8F8F8; padding: 0;">
+            <header class="page-header" style="background-color: #FFF; border-bottom: 1px solid #EEE;">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Upload New Video</h1>
+            </header>
+            <div style="padding: 20px; flex-grow: 1;">
+                <form id="upload-video-form" onsubmit="App.handleVideoUpload(event)">
+                    <p style="color: #333; margin-top: 0; font-weight: 600;">Upload New Short (Any Embed Link)</p>
+                    <div class="form-group">
+                        <label for="video-title" style="color:#555; font-size: 0.9em; display: block; margin-bottom: 5px;">Video Title:</label>
+                        <input type="text" id="video-title" class="input-field" placeholder="Shorts Title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="video-embed-link" style="color:#555; font-size: 0.9em; display: block; margin-bottom: 5px;">Embed Link (iframe src):</label>
+                        <input type="text" id="video-embed-link" class="input-field" placeholder="e.g., https://example.com/embed/video-id" required>
+                    </div>
+                    <button type="submit" class="app-btn primary-btn" style="width: 100%; margin-top: 20px;">UPLOAD SHORT</button>
+                </form>
+            </div>
+        </div>
+
+
+        <div id="profile-screen" class="screen">
+            <header class="page-header">
+                <button class="back-btn" onclick="goBack()">&#10094;</button>
+                <h1>Profile</h1>
+            </header>
+            <p style="text-align: center; margin-bottom: 30px;">You are not logged in.</p>
+            <button class="app-btn primary-btn" onclick="showScreen('login-screen')">Log In</button>
+            <button class="app-btn secondary-btn" onclick="showScreen('register-screen')">Register</button>
+        </div>
+
+
+        <div id="profile-screen-logged-in" class="screen" style="background-color: #121212; padding: 0;">
+            
+            <div class="compact-profile-header" style="padding-top: 20px; flex-shrink: 0; background-color: #1a1a1a;">
+                
+                <header class="page-header" style="background-color: transparent; border-bottom: none; width: 100%; padding: 0 15px 10px; position: relative;">
+                    <button class="back-btn" onclick="goBack()" style="color: #FFC107; position: absolute; left: 15px; top: 15px;">&#10094;</button>
+                    <h1 style="font-size: 1.5em; color: #FFF; margin: 0; text-align: center;">My Profile</h1>
+                </header>
+
+                <div class="profile-icon-wrapper">
+                    <img id="my-profile-icon" src="https://via.placeholder.com/80/E91E63/FFFFFF?text=ME" alt="My Profile Icon" class="profile-icon big">
+                    <div class="edit-profile-icon" onclick="App.promptProfilePic()">
+                        <span class="material-icons">edit</span>
+                    </div>
+                </div>
+                
+                <p style="text-align: center; margin: 5px 0 15px; color: #FFF; font-weight: bold; font-size: 1.1em;">Welcome, <span id="current-user-email">user@gmail.com</span>!</p>
+                
+                <div class="profile-header-stats">
+                    <div class="stat-item">
+                        <strong id="my-follower-count">0</strong>
+                        <span>Followers</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong id="my-following-count">0</strong>
+                        <span>Following</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong id="my-like-count">0</strong>
+                        <span>Likes</span>
+                    </div>
+                </div>
+                
+                <button class="app-btn primary-btn upload-video-btn" onclick="showScreen('upload-video-screen')" style="width: 80%; background-color: #FFC107; color: #000; margin-bottom: 5px;">
+                    <span class="material-icons" style="margin-right: 5px;">cloud_upload</span>
+                    Video Upload
+                </button>
+            </div>
+            
+            <h3 style="margin: 15px 15px 5px; padding-bottom: 5px; border-bottom: 1px solid #333; color: #FFF; font-size: 1em; flex-shrink: 0; background-color: #121212; padding-top: 10px;">Liked History (Last 10)</h3>
+            <div class="scrollable-content" style="background-color: #121212;">
+                <ul id="liked-history-list" style="color: #AAA; list-style: none; padding: 0; margin: 0;">
+                    <li>Loading...</li>
+                </ul>
+            </div>
+            
+            <button class="app-btn secondary-btn" onclick="App.handleLogout()">LOG OUT</button>
+        </div>
+
+
+        <div id="other-user-profile-screen" class="screen" style="background-color: #121212; padding: 0;">
+            <header class="page-header" style="background-color: #1a1a1a; padding: 10px 15px; border-bottom: none; flex-shrink: 0;">
+                <button class="back-btn" onclick="goBack()" style="color: #FFC107;">&#10094;</button>
+                <h1 id="other-user-name" style="font-size: 1.2em; flex-grow: 1; text-align: center; color: #FFF;">@OtherUser</h1>
+            </header>
+            
+            <div class="compact-profile-header" style="padding-top: 20px; background-color: #121212; flex-shrink: 0;">
+                <img id="other-profile-icon" src="https://via.placeholder.com/80/0000FF/FFFFFF?text=P" alt="Profile Icon" class="profile-icon big">
+                
+                <div class="profile-header-stats">
+                    <div class="stat-item">
+                        <strong id="other-follower-count">0</strong>
+                        <span>Followers</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong id="other-following-count">0</strong>
+                        <span>Following</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong id="other-like-count">0</strong>
+                        <span>Likes</span>
+                    </div>
+                </div>
+            </div>
+            
+            <p style="text-align: center; color: #555; margin-top: 20px; padding: 20px;">*Only Profile Icon and Stats are visible for others. Video list is hidden in this compact view.*</p>
+        </div>
+        
+        <div id="comment-screen" class="screen">
+            <header class="comment-modal-header">
+                <button class="back-btn" onclick="App.hideCommentsScreen()">&#10094;</button>
+                <h2 id="comment-count-header">Comments (0)</h2>
+                <div style="width: 30px;"></div> </header>
+            
+            <div class="comment-modal-body">
+                <ul id="comments-list">
+                    </ul>
+            </div>
+            
+            <div class="comment-input-area-wrapper">
+                <form class="comment-input-area" onsubmit="App.handleCommentSubmit(event)">
+                    <textarea id="comment-text-input" placeholder="Add a comment..." required></textarea>
+                    <button type="submit" class="comment-send-btn"></button>
+                </form>
+            </div>
+        </div>
+
+
+        <div class="bottom-nav">
+            <a href="#" class="nav-item active" id="shorts-nav" onclick="showScreen('shorts')">
+                <span class="material-icons">movie</span>
+                <span>Shorts</span>
+            </a>
+            <a href="#" class="nav-item" id="search-nav" onclick="showScreen('search-screen')">
+                <span class="material-icons">search</span>
+                <span>Search</span>
+            </a>
+            <a href="#" class="nav-item" id="profile-nav" onclick="showScreen('profile')">
+                <span class="material-icons">person</span>
+                <span>Profile</span>
+            </a>
+        </div>
+
+    </div>
+
+</body>
+</html>
